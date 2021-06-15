@@ -5,10 +5,15 @@ import android.content.SharedPreferences;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
 import android.os.Bundle;
+import android.view.View;
 import android.widget.ExpandableListView;
+import android.widget.ProgressBar;
+import android.widget.TextView;
 
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.lifecycle.LiveData;
+import androidx.lifecycle.Observer;
+import androidx.lifecycle.ViewTreeLifecycleOwner;
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 
 import com.sample.cleanarchitecturesample.R;
@@ -42,6 +47,8 @@ public class MainActivity extends AppCompatActivity {
     private EmployeeAdapter listAdapter;
     private SwipeRefreshLayout pullToRefresh;
     private SharedPreferences prefs;
+    private ProgressBar progressBar;
+    private TextView txtNoData;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -52,6 +59,8 @@ public class MainActivity extends AppCompatActivity {
         employeeRepository = new EmployeeRepository(getApplicationContext());
         pullToRefresh = findViewById(R.id.pullToRefresh);
         expandableListView = findViewById(R.id.expandableListView);
+        progressBar = findViewById(R.id.progressBar1);
+        txtNoData = findViewById(R.id.txt_no_data);
 
         Retrofit retrofit = new Retrofit.Builder()
                 .baseUrl(EmployeeDetailsService.BASE_URL) // Specify your api here
@@ -70,9 +79,11 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void fetchEmployeeData(Context context) {
+        txtNoData.setVisibility(View.GONE);
         listEmployeeBody.clear();
         listEmployeeHeader.clear();
         if (isConnected) {
+            progressBar.setVisibility(View.VISIBLE);
             prefs = context.getSharedPreferences("application", MODE_PRIVATE);
 
             // Fetching the values into Pojo file
@@ -83,7 +94,6 @@ public class MainActivity extends AppCompatActivity {
                     if (response.body() != null) {
                         List<Data> employeeDataList = response.body().getData();
                         for (int i = 0; i < employeeDataList.size(); i++) {
-
                             Data employeeData = employeeDataList.get(i);
                             String employeeFirstName = employeeData.getFirstname();
                             String employeeLastName = employeeData.getLastname();
@@ -127,57 +137,72 @@ public class MainActivity extends AppCompatActivity {
                                         employeeEducation.getDegree(), employeeEducation.getInstitution());
                             }
                         }
-                        expandableListView.setAdapter(listAdapter);
+                        progressBar.setVisibility(View.GONE);
                         prefs.edit().putBoolean("employeeDataNotSaved", false).apply();
+                        expandableListView.setAdapter(listAdapter);
+                        listAdapter.notifyDataSetChanged();
+                    }
+                    else {
+                        progressBar.setVisibility(View.GONE);
+                        txtNoData.setVisibility(View.VISIBLE);
                     }
                 }
 
                 @Override
                 public void onFailure(Call<EmployeeDetail> call, Throwable t) {
                     t.printStackTrace();
+                    progressBar.setVisibility(View.GONE);
+                    txtNoData.setVisibility(View.VISIBLE);
                 }
             });
         } else {
             LiveData<List<Employee>> employeeDataList = employeeRepository.getTasks();
-            employeeDataList.observe(this, employees -> {
-                for (int i = 0; i < employees.size(); i++) {
-                    Employee employee = employees.get(i);
-                    String employeeName = employee.getEmployee_name();
-                    int employeeAge = employee.getEmployee_age();
-                    String employeeGender = employee.getEmployee_gender();
-                    String employeePicture = employee.getImage_url();
-                    String employeeJobRole = employee.getJob_role();
-                    int employeeExperience = employee.getJob_experience();
-                    String employeeCompany = employee.getCompany();
-                    String employeeDegree = employee.getQualification();
-                    String employeeCollege = employee.getCollege();
+            Observer<List<Employee>> observer = employees -> {
+                if (employees.size() > 0) {
+                    for (int i = 0; i < employees.size(); i++) {
+                        Employee employee = employees.get(i);
+                        String employeeName = employee.getEmployee_name();
+                        int employeeAge = employee.getEmployee_age();
+                        String employeeGender = employee.getEmployee_gender();
+                        String employeePicture = employee.getImage_url();
+                        String employeeJobRole = employee.getJob_role();
+                        int employeeExperience = employee.getJob_experience();
+                        String employeeCompany = employee.getCompany();
+                        String employeeDegree = employee.getQualification();
+                        String employeeCollege = employee.getCollege();
 
-                    List<Object> listOtherData = new ArrayList<>();
-                    List<String> listProfileHeader = new ArrayList<>();
-                    if (employeeAge > 0)
-                        listOtherData.add("<b>Age:</b>  " + employeeAge);
-                    if (employeeGender != null)
-                        listOtherData.add("<b>Gender:</b>  " + employeeGender);
-                    if (employeeJobRole != null)
-                        listOtherData.add("<b>Role:</b>  " + employeeJobRole);
-                    if (employeeExperience > 0)
-                        listOtherData.add("<b>Experience:</b>  " + employeeExperience + " years");
-                    if (employeeCompany != null)
-                        listOtherData.add("<b>Organization:</b>  " + employeeCompany);
-                    if (employeeDegree != null)
-                        listOtherData.add("<b>Degree:</b>  " + employeeDegree);
-                    if (employeeCollege != null)
-                        listOtherData.add("<b>Institution:</b>  " + employeeCollege);
+                        List<Object> listOtherData = new ArrayList<>();
+                        List<String> listProfileHeader = new ArrayList<>();
+                        if (employeeAge > 0)
+                            listOtherData.add("<b>Age:</b>  " + employeeAge);
+                        if (employeeGender != null)
+                            listOtherData.add("<b>Gender:</b>  " + employeeGender);
+                        if (employeeJobRole != null)
+                            listOtherData.add("<b>Role:</b>  " + employeeJobRole);
+                        if (employeeExperience > 0)
+                            listOtherData.add("<b>Experience:</b>  " + employeeExperience + " years");
+                        if (employeeCompany != null)
+                            listOtherData.add("<b>Organization:</b>  " + employeeCompany);
+                        if (employeeDegree != null)
+                            listOtherData.add("<b>Degree:</b>  " + employeeDegree);
+                        if (employeeCollege != null)
+                            listOtherData.add("<b>Institution:</b>  " + employeeCollege);
 
-                    fullName = employeeName;
-                    listProfileHeader.add(fullName);
-                    if (employeePicture != null)
-                        listProfileHeader.add(employeePicture);
-                    listEmployeeHeader.add(listProfileHeader);
-                    listEmployeeBody.put(fullName, listOtherData);
+                        fullName = employeeName;
+                        listProfileHeader.add(fullName);
+                        if (employeePicture != null)
+                            listProfileHeader.add(employeePicture);
+                        listEmployeeHeader.add(listProfileHeader);
+                        listEmployeeBody.put(fullName, listOtherData);
+                    }
+                    expandableListView.setAdapter(listAdapter);
+                    listAdapter.notifyDataSetChanged();
+                    return;
                 }
-                expandableListView.setAdapter(listAdapter);
-            });
+                txtNoData.setVisibility(View.VISIBLE);
+                employeeDataList.removeObservers((AppCompatActivity) context);
+            };
+            employeeDataList.observe((AppCompatActivity) context, observer);
         }
     }
 
